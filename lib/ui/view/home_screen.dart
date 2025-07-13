@@ -1,3 +1,5 @@
+import 'package:financial_tracker/ui/widget/transaction_edit_sheet.dart';
+
 import '../../common/config/dependencies.dart';
 import '../../common/types/date_filter_type.dart';
 import '../../domain/entity/transaction_entity.dart';
@@ -178,6 +180,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 undoDelete: viewModelController.undoDelectedTransaction,
                 scaffoldContext: context,
+
+                 onEdit: (transaction) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (context) => TransactionEditSheet(
+                      transaction: transaction,
+                      submitCommand: viewModelController.saveTransaction,
+                    ),
+                    
+                  );
+                },
               );
             }),
 

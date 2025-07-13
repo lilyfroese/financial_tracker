@@ -8,16 +8,18 @@ import 'package:flutter/material.dart';
 /// widget que exibe uma lista de transações de receitas e despesas
 class TransactionCardSheets extends StatefulWidget {
   final List<TransactionEntity>
-  incomeTransactions; // Lista de transações de receitas
+      incomeTransactions; // Lista de transações de receitas
   final List<TransactionEntity>
-  expenseTransactions; // Lista de transações de despesas
-  final Function(String id)
-  onDelete; // Callback para deletar uma transação pelo ID
+      expenseTransactions; // Lista de transações de despesas
+  final Function(String id) onDelete; // Callback para deletar uma transação pelo ID
 
   final Command1<void, Failure, TransactionEntity>
-  undoDelete; // Callback para desfazer exclusão
+      undoDelete; // Callback para desfazer exclusão
   final BuildContext
-  scaffoldContext; // Contexto do Scaffold para exibir SnackBars
+      scaffoldContext; // Contexto do Scaffold para exibir SnackBars
+
+  /// Novo callback para edição
+  final Function(TransactionEntity transaction) onEdit;
 
   const TransactionCardSheets({
     super.key,
@@ -26,6 +28,7 @@ class TransactionCardSheets extends StatefulWidget {
     required this.onDelete,
     required this.undoDelete,
     required this.scaffoldContext,
+    required this.onEdit, // recebe callback de edição
   });
 
   @override
@@ -44,8 +47,7 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
       vsync: this,
     ); // 2 abas: Receitas e Despesas
     _tabController.addListener(() {
-      if (mounted)
-        setState(() {}); // Atualiza o estado quando troca de aba acontece
+      if (mounted) setState(() {}); // Atualiza o estado quando troca de aba acontece
     });
   }
 
@@ -72,9 +74,7 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: colorScheme.tertiary.withValues(
-                    alpha: 0.15,
-                  ), // Fundo com transparência
+                  color: colorScheme.tertiary.withAlpha(38), // fundo translúcido
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
@@ -88,24 +88,21 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
                       Icons.arrow_upward, // Ícone da aba
                       0, // Índice da aba
                       colorScheme.primary, // Cor ativa
-                      colorScheme.primary.withValues(alpha: 0.5), // Cor inativa
+                      colorScheme.primary.withAlpha(128), // Cor inativa
                     ),
                     _buildTab(
                       TransactionType.expense.namePlural,
                       Icons.arrow_downward,
                       1,
                       colorScheme.secondary,
-                      colorScheme.secondary.withValues(alpha: 0.5),
+                      colorScheme.secondary.withAlpha(128),
                     ),
                   ],
                   indicatorColor:
-                      _tabController.index ==
-                              0 // Cor do indicador da aba selecionada
+                      _tabController.index == 0 // Cor do indicador da aba selecionada
                           ? colorScheme.primary
                           : colorScheme.secondary,
-                  indicatorSize:
-                      TabBarIndicatorSize
-                          .label, // Indicador do tamanho do label
+                  indicatorSize: TabBarIndicatorSize.label,
                 ),
               ),
               ClipRRect(
@@ -148,25 +145,20 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
     Color activeColor,
     Color inactiveColor,
   ) {
-    final isSelected =
-        _tabController.index == index; // Verifica se a aba está selecionada
-    final color =
-        isSelected ? activeColor : inactiveColor; // Cor ativa ou inativa
+    final isSelected = _tabController.index == index;
+    final color = isSelected ? activeColor : inactiveColor;
 
     return Tab(
       child: Row(
-        mainAxisSize: MainAxisSize.min, // Tamanho da linha adaptado ao conteúdo
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color), // Ícone da aba com a cor correta
-          const SizedBox(width: 8), // Espaço entre ícone e texto
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
           Text(
-            title, // Texto da aba
+            title,
             style: TextStyle(
-              color: color, // Cor do texto (ativa ou inativa)
-              fontWeight:
-                  isSelected
-                      ? FontWeight.bold
-                      : FontWeight.normal, // Negrito se selecionada
+              color: color,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ],
@@ -183,24 +175,21 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
     if (transactions.isEmpty) {
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // Centraliza conteúdo
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              title ==
-                      TransactionType
-                          .income
-                          .namePlural // Receitas
+              title == TransactionType.income.namePlural
                   ? Icons.savings
-                  : Icons.shopping_cart, // Ícone condicional
+                  : Icons.shopping_cart,
               size: 48,
               color: Colors.grey,
             ),
             const SizedBox(height: 8),
             Text(
-              'Sem ${title.toLowerCase()} registradas', // Mensagem de lista vazia
+              'Sem ${title.toLowerCase()} registradas',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.grey[600],
-              ), // Estilo e cor do texto
+                    color: Colors.grey[600],
+                  ),
             ),
           ],
         ),
@@ -208,139 +197,148 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
     }
 
     return Scrollbar(
-      thumbVisibility: true, // Mostra a barra de rolagem sempre
+      thumbVisibility: true,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-        ), // Espaçamento vertical na lista
-        itemCount: transactions.length, // Quantidade de itens da lista
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: transactions.length,
         itemBuilder: (context, index) {
           final transaction = transactions[index];
-          final undoTransaction =
-              transaction.copyWith(); // Cópia para desfazer exclusão
+          final undoTransaction = transaction.copyWith();
 
-          return Dismissible(
-            key: Key(transaction.id), // Chave única para controle do widget
-            direction:
-                DismissDirection
-                    .endToStart, // Permite deslizar da direita para esquerda
-            background: Container(
-              alignment:
-                  Alignment.centerRight, // Ícone aparece alinhado à direita
-              padding: const EdgeInsets.only(
-                right: 20.0,
-              ), // Espaçamento interno
-              decoration: BoxDecoration(
-                color: Colors.red, // Fundo vermelho para exclusão
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.delete,
-                color: Colors.white,
-              ), // Ícone de exclusão
-            ),
-            onDismissed: (direction) async {
-              
-              await widget.onDelete(
-                transaction.id,
-              ); // Chama callback para deletar transação
+          return _buildDismissibleTransactionItem(
+              context, transaction, undoTransaction, color, title);
+        },
+      ),
+    );
+  }
 
-              ScaffoldMessenger.of(widget.scaffoldContext).clearSnackBars();
-              // Limpa snackbars anteriores para evitar sobreposição
 
-              ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '${transaction.title} excluída!!!',
-                  ), // Mensagem de exclusão
-                  backgroundColor:
-                      Colors.pinkAccent, // Cor do snackbar vermelho
-                  action: SnackBarAction(
-                    label: 'DESFAZER', // Botão para desfazer
-                    textColor: Colors.white,
-                    onPressed: () async {
-                      // Chama callback para desfazer exclusão
-                      await widget.undoDelete.execute(undoTransaction);
-                      //print(widget.undoDelete.resultSignal.value);
-                      if (widget.undoDelete.resultSignal.value?.isSuccess ??
-                          false) {
-                        ScaffoldMessenger.of(
-                          widget.scaffoldContext,
-                        ).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${transaction.title} restaurada!',
-                            ), // Mensagem de restauração
-                            backgroundColor:
-                                Colors.green, // Cor do snackbar verde
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(
-                          widget.scaffoldContext,
-                        ).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${widget.undoDelete.resultSignal.value?.failureValueOrNull ?? 'Erro desconhecido'}',
-                            ), // Mensagem de restauração
-                            backgroundColor:
-                                Colors.red, // Cor do snackbar verde
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              );
-            },
-            child: Card(
-              margin: const EdgeInsets.symmetric(
-                horizontal: 5,
-                vertical: 4,
-              ), // Margem do card da transação
-              elevation: 0, // Sem sombra
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12), // Bordas arredondadas
-                side: BorderSide(
-                  color: Colors.grey.shade300,
-                ), // Borda cinza clara
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ), // Espaçamento interno do item
-                leading: CircleAvatar(
-                  radius: 22,
-                  backgroundColor: color.withValues(
-                    alpha: 0.2,
-                  ), // Fundo com transparência
-                  child: Icon(
-                    title == 'Income' ? Icons.attach_money : Icons.shopping_bag,
-                    color: color, // Cor do ícone conforme tipo
-                  ),
-                ),
-                title: Text(
-                  transaction.title, // Título da transação
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                subtitle: Text(
-                  Formatter.formatDate(transaction.date), // Data formatada
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                trailing: Text(
-                  Formatter.formatCurrency(
-                    transaction.amount,
-                  ), // Valor formatado em moeda
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color, // Cor do texto conforme tipo
-                  ),
-                ),
+  Widget _buildDismissibleTransactionItem(
+    BuildContext context,
+    TransactionEntity transaction,
+    TransactionEntity undoTransaction,
+    Color color,
+    String title,
+  ) {
+    return Dismissible(
+      key: Key(transaction.id),
+      direction: DismissDirection.horizontal, // permite ambos os lados
+      background: _buildEditBackground(), // esquerda para direita
+      secondaryBackground: _buildDeleteBackground(), // direita para esquerda
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          // Lógica para edição - não remove o item da lista, só chama o callback
+          widget.onEdit(transaction);
+          return false; // não remove o item da lista
+        } else if (direction == DismissDirection.endToStart) {
+          // Confirma exclusão
+          // Aqui você pode adicionar um diálogo para confirmar, se quiser
+          return true; // permite a exclusão
+        }
+        return false;
+      },
+      onDismissed: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          await widget.onDelete(transaction.id);
+
+          ScaffoldMessenger.of(widget.scaffoldContext).clearSnackBars();
+
+          ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(
+            SnackBar(
+              content: Text('${transaction.title} excluída!!!'),
+              backgroundColor: Colors.pinkAccent,
+              action: SnackBarAction(
+                label: 'DESFAZER',
+                textColor: Colors.white,
+                onPressed: () async {
+                  await widget.undoDelete.execute(undoTransaction);
+                  if (widget.undoDelete.resultSignal.value?.isSuccess ?? false) {
+                    ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(
+                      SnackBar(
+                        content: Text('${transaction.title} restaurada!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            '${widget.undoDelete.resultSignal.value?.failureValueOrNull ?? 'Erro desconhecido'}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
               ),
             ),
           );
-        },
+        }
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: Colors.grey.shade300,
+          ),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: CircleAvatar(
+            radius: 22,
+            backgroundColor: color.withAlpha(50),
+            child: Icon(
+              title == TransactionType.income.namePlural ? Icons.attach_money : Icons.shopping_bag,
+              color: color,
+            ),
+          ),
+          title: Text(
+            transaction.title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          subtitle: Text(
+            Formatter.formatDate(transaction.date),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          trailing: Text(
+            Formatter.formatCurrency(transaction.amount),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditBackground() {
+    return Container(
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 20),
+      decoration: BoxDecoration(
+        color: Colors.blue, // Fundo azul para editar
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(
+        Icons.edit,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildDeleteBackground() {
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 20),
+      decoration: BoxDecoration(
+        color: Colors.red, // Fundo vermelho para deletar
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(
+        Icons.delete,
+        color: Colors.white,
       ),
     );
   }
