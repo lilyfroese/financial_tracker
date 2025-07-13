@@ -221,7 +221,7 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets>
     String title,
   ) {
     return Dismissible(
-      key: Key(transaction.id),
+      key: ValueKey('${transaction.id}_${transaction.date.toIso8601String()}'),
       direction: DismissDirection.horizontal, // permite ambos os lados
       background: _buildEditBackground(), // esquerda para direita
       secondaryBackground: _buildDeleteBackground(), // direita para esquerda

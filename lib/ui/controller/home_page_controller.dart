@@ -142,8 +142,19 @@ class HomePageController {
       transaction: transaction,
     ));
 
+  //parte que faz ela funcinar 
     if (result.isSuccess) {
-      _transactions.value = [..._transactions.value, transaction];
+      final list = [..._transactions.value];
+      final index = list.indexWhere((t) => t.id == transaction.id);
+
+      if (index != -1) {
+        list[index] = transaction.copyWith(); 
+
+      } else {
+        list.add(transaction); 
+      }
+
+      _transactions.value = list; 
     }
 
     return result;
